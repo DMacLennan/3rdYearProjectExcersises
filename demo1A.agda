@@ -1,5 +1,6 @@
 --i do not own this code 
---this is simply code i looked worked through with my supervisor 
+--this is simply code i looked worked through with my supervisor
+--Some of the code has been modified by me 
 --full credit goes to Lyndon Maydwell
 --the original code can be found at https://gist.github.com/sordina/3048465
 
