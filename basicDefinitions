@@ -1,0 +1,102 @@
+module basicDefinitions where
+
+
+infix  4   if_then_else
+infixr 5   _∧_
+infix  8   _≥_ 
+infixr 9   _::_
+infixl 10   _+_
+infixl 10   _-_
+infixl 12   _*_
+
+data ℕ : Set where
+        zero : ℕ 
+        succ : ℕ → ℕ 
+{-# BUILTIN NATURAL  ℕ    #-}
+
+data Bool : Set where
+        tt ff  : Bool
+{-# BUILTIN BOOL Bool #-}
+{-# BUILTIN TRUE tt #-}
+{-# BUILTIN FALSE ff #-}
+
+data _∧_ (A B : Set) : Set where
+        and : A → B → A ∧ B
+
+data ⊤ : Set where    
+        trivial : ⊤    
+
+data ⊥ : Set where
+
+data List (X : Set) : Set where
+        []    :  List X
+        _::_  :  X → List X → List X
+{-# BUILTIN LIST List #-}
+{-# BUILTIN NIL [] #-}
+{-# BUILTIN CONS _::_ #-}
+
+
+_+_ : ℕ → ℕ → ℕ
+n + 0 = n
+n + (succ m) = succ (n + m)
+{-# BUILTIN NATPLUS  _+_  #-}
+
+
+_*_ : ℕ → ℕ → ℕ
+n * 0 = 0
+n * (succ m) = n * m + n
+{-# BUILTIN NATTIMES _*_ #-}
+
+private pred : ℕ → ℕ
+pred (succ n) = n
+pred zero = zero
+
+_-_ : ℕ → ℕ → ℕ
+n - zero = n
+n - (succ m) = pred (n - m)
+
+
+_∧Bool_ : Bool → Bool → Bool
+tt ∧Bool tt = tt
+_  ∧Bool _  = ff
+
+_∨Bool_ : Bool → Bool → Bool
+ff ∨Bool ff = ff
+_  ∨Bool _  = tt
+
+
+_≥_ : ℕ → ℕ → Bool
+_ ≥ 0 = tt
+0 ≥ succ _ = ff
+succ n ≥ succ m = n ≥ m
+
+if_then_else : {A : Set}→ Bool → A → A → A
+if tt then x  else _ = x
+if ff then  _ else y = y 
+
+IsTrue : Bool → Set
+IsTrue tt = ⊤ 
+IsTrue ff = ⊥   
+
+--Alternative arithmetic operator definitions
+_+'_ : ℕ → ℕ → ℕ
+0 +' n = n
+succ m +' n = succ (m +' n)
+
+_+''_ : ℕ → ℕ → ℕ
+0 +'' n = n
+n +'' 0 = n
+succ n +'' succ m = succ ( succ ( n +'' m))
+
+
+_*'_ : ℕ → ℕ → ℕ 
+0 *' n = 0 
+n *' 0 = 0
+succ n *' succ m = n *' m + n + m + 1
+
+minus : (n m : ℕ) → IsTrue (n ≥ m) → ℕ 
+minus n        0        _ = n
+minus zero     (succ _) ()
+minus (succ n) (succ m) p = minus n m p
+
+
