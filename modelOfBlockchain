@@ -1,0 +1,165 @@
+open import basicDefinitions 
+
+module modelOfBlockchain (Message : Set )
+                                             (PublicKey : Set)
+                                             (Names : Set) 
+                                             (nameToPublicKey : Names → PublicKey)
+                                             (checkKey  : Message → PublicKey → Bool )
+                                             (EqNames : Names → Names → Set)
+                                             (EqPubKeyBool : PublicKey → PublicKey → Bool) 
+                                             (messageToNat : Message → ℕ ) where 
+
+
+infix  8   _==Names_
+infix  8   _==PubKey_
+infix  8   _==PubKeyBool_
+
+
+_==Names_ : Names → Names → Set
+_==Names_  = EqNames
+
+_==PubKeyBool_  : PublicKey → PublicKey → Bool
+_==PubKeyBool_  = EqPubKeyBool
+
+_==PubKey_  : PublicKey → PublicKey → Set 
+key1 ==PubKey key2 = IsTrue (key1 ==PubKeyBool key2)
+
+
+data Input : Set where
+        input : (message : Message)
+                    → (publicKey : PublicKey)
+                    → IsTrue (checkKey message publicKey)
+                    → Input
+
+data Output : Set where
+        output : (n : ℕ )
+                      → PublicKey
+                      → Output
+
+data Transaction : Set where
+        transaction : List Input
+                             → List Output
+                             → Transaction
+
+data KeyIsPublicKeyOfAName ( key : PublicKey) : Set where
+        keyIsPublicKeyOfAName : (n : Names)
+                                                  → nameToPublicKey n ==PubKey key 
+                                                  → KeyIsPublicKeyOfAName key
+
+data Block : Set where 
+        block : List Transaction
+                    → (miner : Names)
+                    → (reward : ℕ)
+                    → Block
+
+
+ListOfInputs : Set
+ListOfInputs = List Input
+
+Time : Set
+Time = ℕ 
+
+Amount : Set
+Amount = ℕ 
+
+Ledger : Set
+Ledger = Names → ℕ
+
+LedgerHistory : Set
+LedgerHistory = Time →  Ledger
+
+BlockChain : Set 
+BlockChain = List Block
+
+BitcoinsInCirculation : Set
+BitcoinsInCirculation = ℕ 
+
+
+
+inputPublicKeysAreProper : List Input → Set
+inputPublicKeysAreProper [] = ⊤
+inputPublicKeysAreProper (input message publicKey x :: inputs) = KeyIsPublicKeyOfAName publicKey ∧ inputPublicKeysAreProper inputs
+
+
+outputPublicKeysAreProper : List Output → Set
+outputPublicKeysAreProper [] = ⊤
+outputPublicKeysAreProper (output n k' :: outputs) = KeyIsPublicKeyOfAName k' ∧ outputPublicKeysAreProper outputs
+
+
+sumOfOutputs : List Output → PublicKey → ℕ 
+sumOfOutputs' : ℕ → PublicKey → List Output → PublicKey → Bool → ℕ 
+
+sumOfOutputs [] k = 0
+sumOfOutputs (output n k :: l) k' = sumOfOutputs' n k l k' (k ==PubKeyBool k') 
+
+sumOfOutputs' n k l k' tt = n + sumOfOutputs l k'
+sumOfOutputs' n k l k' ff = sumOfOutputs l k'
+
+
+sumOfInputs : List  Input → PublicKey → ℕ 
+sumOfInputs' : (message : Message)
+                         → (publicKey : PublicKey)
+                         → IsTrue (checkKey message publicKey)
+                         → List Input
+                         → PublicKey
+                         → Bool 
+                         → ℕ  
+
+sumOfInputs [] k = 0
+sumOfInputs (input m k x :: l) k' = sumOfInputs' m k x l k' (k ==PubKeyBool k')
+
+sumOfInputs' m k x l k' tt = messageToNat m + sumOfInputs l k'
+sumOfInputs' m k x l k' ff = sumOfInputs l k
+
+
+sumOfInputsTotal : List Input → ℕ 
+sumOfInputsTotal [] = 0
+sumOfInputsTotal (input message publicKey x :: l) = messageToNat message + sumOfInputsTotal l
+
+sumOfOutputsTotal : List Output → ℕ 
+sumOfOutputsTotal [] = 0
+sumOfOutputsTotal (output m publicKey :: l) = m + sumOfOutputsTotal l
+
+
+checkKeysInInput : List Input → Bool
+checkKeysInInput [] = tt
+checkKeysInInput (input message publicKey x :: inp) = checkKey message publicKey ∧Bool checkKeysInInput inp
+
+ 
+correctSingleTransaction : Ledger → Transaction → Set
+correctSingleTransaction valuesBefore (transaction inputlist outputlist) = IsTrue (checkKeysInInput inputlist) 
+                                                                                                                     ∧ ((name : Names) → IsTrue (valuesBefore name ≥ sumOfInputs inputlist (nameToPublicKey name)))  
+                                                                                                                     ∧ IsTrue (sumOfInputsTotal inputlist ≥ sumOfOutputsTotal outputlist )
+                                                                                                                     ∧ inputPublicKeysAreProper inputlist 
+                                                                                                                     ∧ outputPublicKeysAreProper outputlist                    
+
+
+nextLedgerAfterSingleTransaction : Ledger → Transaction → Ledger
+nextLedgerAfterSingleTransaction f (transaction inputlist outputlist) name = f name - sumOfInputs inputlist (nameToPublicKey name) + sumOfOutputs outputlist (nameToPublicKey name)
+
+
+nextLedgerAfterListTransactions : (oldLedger : Ledger) → (l : List Transaction) → Ledger
+nextLedgerAfterListTransactions oldLedger [] name = oldLedger name
+nextLedgerAfterListTransactions oldLedger (trans :: l) name = nextLedgerAfterListTransactions (nextLedgerAfterSingleTransaction oldLedger trans) l name
+
+
+nextLedgerForMiner : (oldLedger : Ledger) (miner : Names)(minedamount : ℕ) → Ledger
+nextLedgerForMiner oldLedger miner minedamount name = if nameToPublicKey miner ==PubKeyBool nameToPublicKey name 
+                                                                                                 then oldLedger name + minedamount
+                                                                                                 else   (oldLedger name)
+
+
+nextLedgerAfterBlock : (oldLedger : Ledger) → (b : Block) → Ledger
+nextLedgerAfterBlock' : (newLedger : Ledger) →  (reward : ℕ) → Bool → Ledger
+
+nextLedgerAfterBlock oldLedger (block l name' reward) name = let 
+                                                                                                          newLedger : Ledger
+                                                                                                          newLedger = nextLedgerAfterListTransactions oldLedger l
+                                                                                                      in 
+                                                                                                          nextLedgerAfterBlock' newLedger  reward (nameToPublicKey name' ==PubKeyBool nameToPublicKey name) name 
+
+nextLedgerAfterBlock'  newLedger reward tt name = newLedger name + reward
+nextLedgerAfterBlock' newLedger reward ff name = newLedger name
+
+bitcoinsInCirculationAfterBlock : (oldBitcoinsInCirculation : BitcoinsInCirculation) → (b : Block) → BitcoinsInCirculation
+bitcoinsInCirculationAfterBlock oldBitcoinsInCirculation (block transactions miner reward) = oldBitcoinsInCirculation + reward
